@@ -5,6 +5,7 @@
     <link rel="stylesheet" href="css/onsen-css-components.min.css">
     <link rel="manifest" href="/manifest.json">
     <script src="js/onsenui.min.js"></script>
+    <script src="js/MapFunctions.js"></script>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#4285f4">
@@ -1359,6 +1360,76 @@
                 var loadingBar = document.getElementById('loading-bar-map');
                 var map = document.getElementById("current-map");
 
+                var mapTransforms = {
+                    flipY: true, // flip Y coordinates?
+                    finalCanvasHeight: 0, // canvas height after scaling
+                    finalCanvasWidth: 0, // canvas width after scaling
+                    canvasScale: 1, // canvas scale factor
+                    canvasRotationWidth: 0, // width of rectangle that was rotated, 0 if no rotation
+                    canvasTrimmedLeft: 0, // how much was trimmed from left of canvas
+                    canvasTrimmedTop: 0, // how much was trimmed from top of canvas
+                };
+
+                function mapInteraction(e) {
+                    // e is expected to be a MouseEvent
+
+                    // double-check that we're in the correct context
+                    if (document.elementFromPoint(e.clientX, e.clientY) === map) {
+
+                        let mapRect = map.getBoundingClientRect();
+
+                        // map width and height
+                        let mapWidth = mapRect.right - mapRect.left;
+                        let mapHeight = mapRect.bottom - mapRect.top;
+
+                        // (map size) -> (canvas size) multipliers
+                        let m2cMultX = mapTransforms.finalCanvasWidth / mapWidth;
+                        let m2cMultY = mapTransforms.finalCanvasHeight / mapHeight;
+
+                        function mapCoordToTrimmedRotatedScaledCoord(c) {
+                            return [c[0] * m2cMultX, c[1] * m2cMultY];
+                        }
+
+                        function trimmedRotatedScaledCoordToTrimmedRotatedCoord(c) {
+                            return [c[0] / mapTransforms.canvasScale, c[1] / mapTransforms.canvasScale];
+                        }
+
+                        function trimmedRotatedCoordToTrimmedCoord(c) {
+                            let rw = mapTransforms.canvasRotationWidth;
+                            if (rw === 0) {
+                                return c;
+                            } else {
+                                // rotate 90 degrees counterclockwise
+                                return [c[1], rw - c[0]];
+                            }
+                        }
+
+                        function trimmedCoordToCanvasCoord(c) {
+                            return [c[0] + mapTransforms.canvasTrimmedLeft, c[1] + mapTransforms.canvasTrimmedTop];
+                        }
+
+                        // clicked position, in map coordinates
+                        let mapClickCoord = [e.clientX - mapRect.left, e.clientY - mapRect.top];
+
+                        let trimmedRotatedScaledCoord = mapCoordToTrimmedRotatedScaledCoord(mapClickCoord);
+
+                        let trimmedRotatedCoord = trimmedRotatedScaledCoordToTrimmedRotatedCoord(trimmedRotatedScaledCoord);
+
+                        let trimmedCoord = trimmedRotatedCoordToTrimmedCoord(trimmedRotatedCoord);
+
+                        let canvasCoord = trimmedCoordToCanvasCoord(trimmedCoord);
+
+                        let zoneCoord = MapFunctions.canvasCoordToZoneCoord(canvasCoord, mapTransforms.flipY);
+
+                        let text ="Zone coordinate: "+zoneCoord[0]+" , "+zoneCoord[1];
+
+                        ons.notification.toast(text, { buttonLabel: 'Dismiss', timeout: 7500 });
+                    }
+                }
+
+                map.addEventListener('dblclick', mapInteraction);
+
+
                 //PNG of Robot
                 var rocky = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAfCAMAAAHGjw8oAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAADbUExURQAAAICAgICAgICAgICAgICAgHx8fH19fX19fYCAgIGBgX5+foCAgH5+foCAgH9/f39/f35+foCAgH9/f39/f4CAgH5+foGBgYCAgICAgIGBgX9/f39/f35+foCAgH9/f39/f4CAgIODg4eHh4mJiZCQkJycnJ2dnZ6enqCgoKSkpKenp62trbGxsbKysry8vL29vcLCwsXFxcbGxsvLy87OztPT09XV1d/f3+Tk5Ojo6Ozs7O3t7e7u7vHx8fLy8vPz8/X19fb29vf39/j4+Pn5+f39/f7+/v///9yECocAAAAgdFJOUwAGChgcKCkzOT5PVWZnlJmfsLq7wcrS1Nre4OXz+vr7ZhJmqwAAAAlwSFlzAAAXEQAAFxEByibzPwAAAcpJREFUKFNlkolaWkEMhYPggliBFiwWhGOx3AqCsggI4lZt8/5P5ElmuEX5P5hMMjeZJBMRafCvUKnbIqpcioci96owTQWqP0QKC54nImUAyr9k7VD1me4YvibHlJKpVUzQhR+dmdTRSDUvdHh8NK8nhqUVch7cITmXA3rtYDmH+3OL4XI1T+BhJUcXczQxOBXJuve0/daeUr5A6g9muJzo5NI2kPKtyRSGBStKQZ5RC1hENWn6NSRTrDUqLD/lsNKoFTNRETlGMn9dDoGdoDcT1fHPi7EuUDD9dMBw4+6vMQVyInnPXDsdW+8tjWfbYTbzg/OstcagzSlb0+wL/6k+1KPhCrj6YFhzS5eXuHcYNF4bsGtDYhFLTOSMqTsx9e3iyKfynb1SK+RqtEq70RzZPwEGKwv7G0OK1QA42Y+HIgct9P3WWG9ItI/mQTgvoeuWAMdlTRclO/+Km2jwlhDvinGNbyJH6EWV84AJ1wl8JowejqTqTmv+0GqDmVLlg/wLX5Mp2rO3WRs2Zs5fznAVd1EzRh10OONr7hhhM4ctevhiVVxHdYsbq+JzHzaIfdjs5CZ9tGInSfoWEXuL7//fwtn9+Jp7wSryDjBFqnOGeuUxAAAAAElFTkSuQmCC";
                 var charger = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAAdVBMVEUAAAA44Yo44Yo44Yo44Yo44Yo44Yo44Yo44Yp26q844Yr///9767Kv89DG9t2g8Md26q5C44/5/vvz/fjY+ei19NNV5ZtJ45T2/fmY78KP7r1v6atq6Kjs/PPi+u7e+uvM9+Gb8MSS7r+H7bhm6KVh56JZ5p3ZkKITAAAACnRSTlMABTr188xpJ4aepd0A4wAAANZJREFUKM9VklmCgzAMQwkQYCSmLKWl2+zL/Y9YcIUL7wvkJHIUJyKkVcyy+JIGCZILGF//QLEqlTmMdsBEXi56igfH/QVGqvXSu49+1KftCbn+dtxB5LOPfNGQNRaKaQNkTJ46OMGczZg8wJB/9TB+J3nFkyqJMp44vBrnWYhJJmOn/5uVzAotV/zACnbUtTbOpHcQzVx8kxw6mavdpYP90dsNcE5k6xd8RoIb2Xgk6xAbfm5C9NiHtxGiXD/U2P96UJunrS/LOeV2GG4wfBi241P5+NwBnAEUFx9FUdUAAAAASUVORK5CYII=";
@@ -1387,59 +1458,172 @@
                     fn.request("api/map/latest", "GET", function (err, res) {
                         loadingBar.removeAttribute("indeterminate");
                         if (!err) {
+                            mapTransforms.flipY = res.yFlipped;
                             mapImageData = getMapImageData(res.map);
                             mapImageData = scaleImageData(mapImageData, 4);
 
+                            // draw map
                             ctx.putImageData(mapImageData, 0, 0);
 
+                            function drawSpots() {
+                                if (config.spots.length > 0) {
+                                    config.spots.forEach(function (spot) {
+                                        let xy = [spot[1], spot[2]];
+                                        xy = MapFunctions.zoneCoordToCanvasCoord(xy, mapTransforms.flipY);
 
-                            res.path.forEach(function (coord) {
-                                if (first) {
-                                    cold1 = coord[0];
-                                    cold2 = coord[1];
+                                        let radius = 10;
+                                        ctx.beginPath();
+                                        ctx.arc(xy[0], xy[1], radius, 0, 2 * Math.PI, false);
+                                        ctx.fillStyle = 'green';
+                                        ctx.fill();
+                                    });
                                 }
-                                else {
-                                    ctx.beginPath();
-                                    ctx.lineWidth = 2;
-                                    ctx.strokeStyle = "#FFFFFF";
-                                    ctx.moveTo(cold1, cold2);
-                                    ctx.lineTo(coord[0], coord[1]);
-                                    ctx.stroke();
+                            }
 
-                                    cold1 = coord[0];
-                                    cold2 = coord[1];
+                            function drawZones() {
+                                if (config.areas.length > 0) {
+                                    config.areas.forEach(function (zone) {
+                                        let areas = zone[1];
+                                        areas.forEach(function (area) {
+                                            let a1 = [area[0], area[1]];
+                                            let a2 = [area[2], area[3]];
+
+                                            let c1 = MapFunctions.zoneCoordToCanvasCoord(a1, mapTransforms.flipY);
+                                            let c2 = MapFunctions.zoneCoordToCanvasCoord(a2, mapTransforms.flipY);
+
+                                            // color is assumed to be in the standard hex representation, without alpha, and without the preceding '#'.
+                                            // for now, we keep it simple and draw all zones in the same color (green).
+                                            // This could be expanded later on if needed.
+                                            let color = "00FF00";
+
+                                            ctx.beginPath();
+                                            ctx.lineWidth = 0;
+
+                                            // define the rectangle we're interested in
+                                            ctx.rect(c1[0], c1[1], c2[0] - c1[0], c2[1] - c1[1]);
+
+                                            // "lighten" the area using a transparent white, so the area color will be more pronounced
+                                            ctx.fillStyle = "#ffffff44";
+                                            ctx.fill();
+
+                                            // and fill it using the transparent color
+                                            ctx.fillStyle = "#" + color + "77";
+                                            ctx.fill();
+
+
+                                            // draw outline with the zone color (but darker):
+                                            ctx.lineWidth = 2;
+
+                                            // first, draw the outline in black
+                                            ctx.strokeStyle = "#000000ff";
+                                            ctx.stroke();
+                                            // second, draw it again in the original color, but half-transparent.
+                                            ctx.strokeStyle = "#" + color + "88";
+                                            ctx.stroke();
+
+                                        });
+                                    });
                                 }
-                                first = false;
+                            }
 
-                            });
+                            function drawPath() {
+                                // draw robot path
+                                res.path.forEach(function (coord) {
+                                    if (first) {
+                                        cold1 = coord[0];
+                                        cold2 = coord[1];
+                                    }
+                                    else {
+                                        ctx.beginPath();
+                                        ctx.lineWidth = 2;
+                                        ctx.strokeStyle = "#FFFFFF";
+                                        ctx.moveTo(cold1, cold2);
+                                        ctx.lineTo(coord[0], coord[1]);
+                                        ctx.stroke();
 
+                                        cold1 = coord[0];
+                                        cold2 = coord[1];
+                                    }
+                                    first = false;
+
+                                });
+                            }
+
+                            // draw zones first, then path on top.
+                            drawZones();
+                            drawSpots();
+                            drawPath();
+
+                            // draw charger
                             ctx.drawImage(img_charger,canvas.height/2-img_charger.height/2,canvas.width/2-img_charger.width/2);
 
+                            // draw robot
                             if (res.path.length > 0) {
                                 var angle = Math.atan2(res.path[res.path.length - 1][1] - res.path[res.path.length - 2][1], res.path[res.path.length - 1][0] - res.path[res.path.length - 2][0]) * 180 / Math.PI;
                                 canvasrobot = rotateRobot(img_rocky, angle);
-                                ctx.drawImage(canvasrobot, res.path[res.path.length - 1][0] - 15, res.path[res.path.length - 1][1] - 15, img_rocky.width, img_rocky.height);
+
+                                let rx= res.path[res.path.length - 1][0];
+                                let ry= res.path[res.path.length - 1][1];
+                                ctx.drawImage(canvasrobot, rx - img_rocky.width / 2, ry - img_rocky.height / 2, img_rocky.width, img_rocky.height);
                             }
+
+                            /* Transformations applied to canvas:
+                             * 1. trim
+                             * 2. rotate
+                             * 3. scale
+                             *
+                             * To calculate a coordinate from the map that is displayed to the user, the
+                             * inverse transformations have to be applied in reverse order.
+                             *
+                             * Therefore, the transformation functions store the information required to
+                             * perform their inverse in the mapTransforms variable.
+                            */
 
                             canvas = trimCanvas(canvas);
 
-                            if (window.innerWidth > window.innerHeight) {
-                                if (canvas.height > canvas.width) {
+                            function rotateIfNeeded() {
+                                mapTransforms.canvasRotationWidth = 0;
+
+                                function rotate() {
                                     canvas = rotate90(canvas);
+                                    mapTransforms.canvasRotationWidth = canvas.width;
                                 }
-                            } else if (window.innerHeight > window.innerWidth) {
-                                if (canvas.width > canvas.height) {
-                                    canvas = rotate90(canvas);
+
+                                if (window.innerWidth > window.innerHeight) {
+                                    if (canvas.height > canvas.width) {
+                                        rotate();
+                                    }
+                                } else if (window.innerHeight > window.innerWidth) {
+                                    if (canvas.width > canvas.height) {
+                                        rotate();
+                                    }
                                 }
                             }
 
-                            //The current aspect ratio map view won't scale the image beyond 100%
-                            //hence this hack was created
-                            while (window.innerWidth > canvas.width || window.innerHeight > canvas.height) {
-                                canvas = scaleCanvas(canvas, 2);
+                            rotateIfNeeded();
+
+                            // The current aspect ratio map view won't scale the image beyond 100%,
+                            // hence this hack was created.
+
+                            function scaleCanvasToWindowSize() {
+                                    let sx = window.innerWidth / canvas.width;
+                                    let sy = window.innerHeight / canvas.height;
+
+                                    // integer scale factor to guarantee that the scaled image will be larger in both dimensions
+                                    let scale = Math.ceil(Math.max(sx, sy));
+
+                                    canvas = scaleCanvas(canvas, scale);
+                                    mapTransforms.canvasScale = scale;
                             }
+
+                            scaleCanvasToWindowSize();
+
+
+                            mapTransforms.finalCanvasHeight = canvas.height;
+                            mapTransforms.finalCanvasWidth = canvas.width;
 
                             map.src = canvas.toDataURL();
+
                         } else {
                             ons.notification.toast(err, { buttonLabel: 'Dismiss', timeout: 1500 })
                         }
@@ -1457,6 +1641,7 @@
                 ons.getScriptPage().onHide = function () {
                     window.clearTimeout(currentRefreshTimer);
                 };
+
                 function rotateRobot(img, angle) {
                     var canvasimg = document.createElement("canvas");
                     canvasimg.width = img.width;
@@ -1504,6 +1689,9 @@
                     }
 
                     return function trim(canvas) {
+                        mapTransforms.canvasTrimmedLeft = 0;
+                        mapTransforms.canvasTrimmedTop = 0;
+
                         var ctx = canvas.getContext("2d");
                         var width = canvas.width;
                         var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -1521,6 +1709,9 @@
                             copy.width = trimmed.width;
                             copy.height = trimmed.height;
                             copyCtx.putImageData(trimmed, 0, 0);
+
+                            mapTransforms.canvasTrimmedLeft = left;
+                            mapTransforms.canvasTrimmedTop = top;
 
                             return copy;
                         } catch (e) {
