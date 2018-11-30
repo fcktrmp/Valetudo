@@ -1467,11 +1467,14 @@
 
                             function drawSpots() {
                                 if (config.spots.length > 0) {
+
+                                    // spot radius: minimally less than the radius of the robot image
+                                    let radius = Math.min(img_rocky.width / 2, img_rocky.height / 2) - 1;
+
                                     config.spots.forEach(function (spot) {
                                         let xy = [spot[1], spot[2]];
                                         xy = MapFunctions.zoneCoordToCanvasCoord(xy, mapTransforms.flipY);
 
-                                        let radius = 10;
                                         ctx.beginPath();
                                         ctx.arc(xy[0], xy[1], radius, 0, 2 * Math.PI, false);
                                         ctx.fillStyle = 'green';
@@ -1527,7 +1530,6 @@
                             }
 
                             function drawPath() {
-                                // draw robot path
                                 res.path.forEach(function (coord) {
                                     if (first) {
                                         cold1 = coord[0];
@@ -1549,23 +1551,42 @@
                                 });
                             }
 
-                            // draw zones first, then path on top.
+                            function drawRobot() {
+                                if (res.path.length > 0) {
+                                    var angle = Math.atan2(res.path[res.path.length - 1][1] - res.path[res.path.length - 2][1], res.path[res.path.length - 1][0] - res.path[res.path.length - 2][0]) * 180 / Math.PI;
+                                    canvasrobot = rotateRobot(img_rocky, angle);
+
+                                    let rx = res.path[res.path.length - 1][0];
+                                    let ry = res.path[res.path.length - 1][1];
+
+                                    ctx.drawImage(canvasrobot, rx - img_rocky.width / 2, ry - img_rocky.height / 2);
+                                }
+                            }
+
+                            function drawCharger() {
+                                // original implementation:
+                                // ctx.drawImage(img_charger,canvas.height/2-img_charger.height/2,canvas.width/2-img_charger.width/2);
+
+                                // Note that the charger position actually doesn't seem to be exactly at (0,0), but at a slight offset
+                                // (roughly 0 on the x axis, and roughly -15cm on the y axis). This happens consistently here,
+                                // but it should be verified to make sure that other people confirm this behavior.
+
+                                let charger_xy = MapFunctions.logCoordToCanvasCoord([0, -(MapFunctions.LOG2ZONE_OFFSET_MM / 1000)], mapTransforms.flipY);
+                                ctx.drawImage(img_charger, charger_xy[0] - img_charger.width / 2, charger_xy[1] - img_charger.height / 2);
+                            }
+
+                            // draw zones first, then spots, then path.
                             drawZones();
                             drawSpots();
                             drawPath();
 
-                            // draw charger
-                            ctx.drawImage(img_charger,canvas.height/2-img_charger.height/2,canvas.width/2-img_charger.width/2);
+                            // Finally, draw robot and charger.
+                            // Note: currently, the robot is drawn first, and then the charger on top.
+                            // This is to see how well they line up. In production, you most probably want to
+                            // see the robot on top of the charger, not the other way round.
+                            drawRobot();
+                            drawCharger();
 
-                            // draw robot
-                            if (res.path.length > 0) {
-                                var angle = Math.atan2(res.path[res.path.length - 1][1] - res.path[res.path.length - 2][1], res.path[res.path.length - 1][0] - res.path[res.path.length - 2][0]) * 180 / Math.PI;
-                                canvasrobot = rotateRobot(img_rocky, angle);
-
-                                let rx= res.path[res.path.length - 1][0];
-                                let ry= res.path[res.path.length - 1][1];
-                                ctx.drawImage(canvasrobot, rx - img_rocky.width / 2, ry - img_rocky.height / 2, img_rocky.width, img_rocky.height);
-                            }
 
                             /* Transformations applied to canvas:
                              * 1. trim
@@ -1603,8 +1624,9 @@
                             rotateIfNeeded();
 
                             // The current aspect ratio map view won't scale the image beyond 100%,
-                            // hence this hack was created.
-
+                            // so the map might not actually fill the space available for it, and therefore appear too small.
+                            // This function scales the canvas to be definitely larger than the window size,
+                            // so the browser must downscale it, and it will do so using all the available space.
                             function scaleCanvasToWindowSize() {
                                     let sx = window.innerWidth / canvas.width;
                                     let sy = window.innerHeight / canvas.height;
@@ -1618,7 +1640,7 @@
 
                             scaleCanvasToWindowSize();
 
-
+                            // save information for reverse transforms
                             mapTransforms.finalCanvasHeight = canvas.height;
                             mapTransforms.finalCanvasWidth = canvas.width;
 

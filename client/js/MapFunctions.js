@@ -79,20 +79,24 @@ MapFunctions.canvasCoordToLogCoord = function(coord, flipY) {
     return [x,y];
 };
 
+// There seems to be an offset of 150 mm in both directions,
+// i.e. goto (-1000, -1000) in zone coords results in
+// (0.850, 0.850) in log coords. That's pretty annoying,
+// but for now I can only observe this fact, and hope that others
+// will confirm that their devices behave the same way.
+MapFunctions.LOG2ZONE_OFFSET_MM = 150;
+
 MapFunctions.zoneCoordToLogCoord = function(coord) {
     let zx = coord[0], zy = coord[1];
-    // There seems to be an offset of 150 mm in both directions,
-    // i.e. goto (-1000, -1000) (zone coords) results in
-    // (0.850, 0.850) in log coords.
-    let lx = (-zx - 150) / 1000;
-    let ly = (-zy - 150) / 1000;
+    let lx = (-zx - MapFunctions.LOG2ZONE_OFFSET_MM) / 1000;
+    let ly = (-zy - MapFunctions.LOG2ZONE_OFFSET_MM) / 1000;
     return [lx, ly];
 };
 
 MapFunctions.logCoordToZoneCoord = function(coord) {
     let lx = coord[0], ly = coord[1];
-    let zx = -(Math.round(lx * 1000) + 150);
-    let zy = -(Math.round(ly * 1000) + 150);
+    let zx = -(Math.round(lx * 1000) + MapFunctions.LOG2ZONE_OFFSET_MM);
+    let zy = -(Math.round(ly * 1000) + MapFunctions.LOG2ZONE_OFFSET_MM);
     return [zx, zy];
 };
 
