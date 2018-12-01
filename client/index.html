@@ -1580,12 +1580,9 @@
                             drawSpots();
                             drawPath();
 
-                            // Finally, draw robot and charger.
-                            // Note: currently, the robot is drawn first, and then the charger on top.
-                            // This is to see how well they line up. In production, you most probably want to
-                            // see the robot on top of the charger, not the other way round.
-                            drawRobot();
+                            // draw charger and robot
                             drawCharger();
+                            drawRobot();
 
 
                             /* Transformations applied to canvas:
